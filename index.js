@@ -58,100 +58,109 @@ function currentPlayer(state) {
   return state.players[state.currentPlayer];
 }
 
+// ========== MENU ==========
+function gameMenu(state) {
+  return `🎮 *Pick a game — reply with a number:*\n\n1️⃣ - 🔥 Truth\n2️⃣ - 🎯 Dare\n3️⃣ - 🙅 Never Have I Ever\n4️⃣ - 🤔 Would You Rather\n5️⃣ - 🍾 Spin the Bottle\n6️⃣ - 🍺 Drinking Game\n7️⃣ - 🎭 Charades\n8️⃣ - 🔄 Change Mode\n9️⃣ - 👥 Change Players\n\n*Mode:* ${state.mode.toUpperCase()} | *Players:* ${state.players.join(', ')}`;
+}
+
+function modeMenu() {
+  return `🔄 *Pick a mode — reply with a number:*\n\n1️⃣ - 😊 Normal\n2️⃣ - 🔞 Naughty\n3️⃣ - 💀 Extreme`;
+}
+
 // ========== BOT LOGIC ==========
 function handleMessage(from, body) {
-  const msg = body.trim().toLowerCase();
+  const msg = body.trim();
+  const msgLower = msg.toLowerCase();
   const state = getState(from);
   let response = '';
 
-  // HELP
-  if (msg === '!help' || msg === 'hi' || msg === 'hello' || msg === '!start') {
-    response = `🌙✨ *Welcome to NightSpark Bot!* ✨🌙\n\nThe ultimate party game for your group!\n\n*Commands:*\n👥 *!players* - Add players\n🎮 *!games* - See all games\n😊 *!mode normal* - Normal mode\n🔞 *!mode naughty* - Naughty mode\n💀 *!mode extreme* - Extreme mode\n\n*Games:*\n🔥 *!truth* - Truth question\n🎯 *!dare* - Dare challenge\n🙅 *!nhie* - Never Have I Ever\n🤔 *!wyr* - Would You Rather\n🍾 *!spin* - Spin the bottle\n🍺 *!drink* - Drinking rule\n🎭 *!charades* - Charades word\n\nType *!help* anytime to see this menu!`;
+  // WAITING FOR PLAYERS
+  if (state.waitingFor === 'players') {
+    const names = msg.split(',').map(n => n.trim()).filter(n => n.length > 0);
+    if (names.length < 2) {
+      response = `⚠️ Please add at least 2 players!\n\nExample: *John, Sarah, Mike*`;
+    } else {
+      state.players = names;
+      state.currentPlayer = 0;
+      state.waitingFor = null;
+      response = `👥 *Players added!*\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}\n\n🎯 First up: *${names[0]}*\n\n${gameMenu(state)}`;
+    }
+    return response;
   }
 
-  // SET PLAYERS
-  else if (msg.startsWith('!players ')) {
-    const names = body.replace(/!players /i, '').split(',').map(n => n.trim());
-    state.players = names;
-    state.currentPlayer = 0;
-    response = `👥 *Players added!*\n${names.map((n, i) => `${i + 1}. ${n}`).join('\n')}\n\n🎯 First up: *${names[0]}*\nType any game command to start!`;
+  // WAITING FOR MODE
+  if (state.waitingFor === 'mode') {
+    state.waitingFor = null;
+    if (msg === '1') { state.mode = 'normal'; response = `😊 *Normal Mode ON!*\n\n${gameMenu(state)}`; }
+    else if (msg === '2') { state.mode = 'naughty'; response = `🔞 *Naughty Mode ON!*\n\n${gameMenu(state)}`; }
+    else if (msg === '3') { state.mode = 'extreme'; response = `💀 *Extreme Mode ON!*\n\n${gameMenu(state)}`; }
+    else { state.waitingFor = 'mode'; response = `⚠️ Reply with 1, 2 or 3\n\n${modeMenu()}`; }
+    return response;
   }
 
-  else if (msg === '!players') {
-    response = `👥 To add players type:\n*!players Name1, Name2, Name3*\n\nExample:\n*!players John, Sarah, Mike, Lisa*`;
+  // WELCOME
+  if (msgLower === 'hi' || msgLower === 'hello' || msgLower === 'start' || msgLower === '!start') {
+    state.waitingFor = 'players';
+    response = `🌙✨ *Welcome to NightSpark!* ✨🌙\n\nThe ultimate party game bot! 🎉\n\n👥 *First, type the names of all players separated by commas:*\n\nExample: *John, Sarah, Mike, Lisa*`;
+    return response;
   }
 
-  // MODE
-  else if (msg === '!mode normal') {
-    state.mode = 'normal';
-    response = `😊 *Normal Mode ON!*\nClean and fun for everyone!`;
-  }
-  else if (msg === '!mode naughty') {
-    state.mode = 'naughty';
-    response = `🔞 *Naughty Mode ON!*\nFlirty and bold — 18+ only!`;
-  }
-  else if (msg === '!mode extreme') {
-    state.mode = 'extreme';
-    response = `💀 *Extreme Mode ON!*\nWild and adults only — you've been warned! 🔥`;
+  // NO PLAYERS YET
+  if (state.players.length === 0) {
+    state.waitingFor = 'players';
+    response = `🌙 *NightSpark Bot*\n\n👥 Type the names of all players to get started:\n\nExample: *John, Sarah, Mike*`;
+    return response;
   }
 
-  // TRUTH
-  else if (msg === '!truth') {
+  // GAME MENU NUMBERS
+  if (msg === '1') {
     const q = rand(data.truth[state.mode]);
     const player = currentPlayer(state);
-    response = `🔥 *TRUTH for ${player}!*\n\n"${q}"\n\n_Type !truth for another or !dare for a dare_\n➡️ Next: ${nextPlayer(state)}`;
+    nextPlayer(state);
+    response = `🔥 *TRUTH for ${player}!*\n\n"${q}"\n\n➡️ Next up: *${currentPlayer(state)}*\n\n${gameMenu(state)}`;
   }
-
-  // DARE
-  else if (msg === '!dare') {
+  else if (msg === '2') {
     const d = rand(data.dare[state.mode]);
     const player = currentPlayer(state);
-    response = `🎯 *DARE for ${player}!*\n\n"${d}"\n\n_Type !dare for another or !truth for a truth_\n➡️ Next: ${nextPlayer(state)}`;
+    nextPlayer(state);
+    response = `🎯 *DARE for ${player}!*\n\n"${d}"\n\n➡️ Next up: *${currentPlayer(state)}*\n\n${gameMenu(state)}`;
   }
-
-  // NHIE
-  else if (msg === '!nhie') {
+  else if (msg === '3') {
     const q = rand(data.nhie[state.mode]);
-    response = `🙅 *Never Have I Ever!*\n\n"${q}"\n\n🙋 Everyone who HAS — take a sip!\n_Type !nhie for another_`;
+    response = `🙅 *Never Have I Ever!*\n\n"${q}"\n\n🙋 Everyone who HAS done this — take a sip!\n\n${gameMenu(state)}`;
   }
-
-  // WOULD YOU RATHER
-  else if (msg === '!wyr') {
+  else if (msg === '4') {
     const q = rand(data.wyr[state.mode]);
-    response = `🤔 *Would You Rather?*\n\n"${q}"\n\n🗣 Everyone votes! Minority drinks!\n_Type !wyr for another_`;
+    response = `🤔 *Would You Rather?*\n\n"${q}"\n\n🗣 Everyone votes! Minority drinks!\n\n${gameMenu(state)}`;
   }
-
-  // SPIN THE BOTTLE
-  else if (msg === '!spin') {
+  else if (msg === '5') {
     if (state.players.length < 2) {
-      response = `🍾 Add at least 2 players first!\nType: *!players Name1, Name2, Name3*`;
+      response = `🍾 Need at least 2 players!\n\n${gameMenu(state)}`;
     } else {
       const picked = rand(state.players);
-      response = `🍾 *Spinning the bottle...*\n\n🌀🌀🌀\n\n✨ It landed on... *${picked}!* ✨\n\n_Type !spin to spin again_`;
+      response = `🍾 *Spinning the bottle...*\n\n🌀🌀🌀\n\n✨ It landed on... *${picked}!* ✨\n\n${gameMenu(state)}`;
     }
   }
-
-  // DRINKING
-  else if (msg === '!drink') {
+  else if (msg === '6') {
     const rule = rand(data.drink);
-    response = `🍺 *Drink Rule!*\n\n"${rule}"\n\n🫗 Drink responsibly!\n_Type !drink for another rule_`;
+    response = `🍺 *Drink Rule!*\n\n"${rule}"\n\n🫗 Drink responsibly!\n\n${gameMenu(state)}`;
   }
-
-  // CHARADES
-  else if (msg === '!charades') {
+  else if (msg === '7') {
     const word = rand(data.charades);
     const player = currentPlayer(state);
-    response = `🎭 *Charades for ${player}!*\n\n👁 Only ${player} looks!\nWord: *${word}*\n\n⏱ 60 seconds to act it out!\n_Type !charades for another_\n➡️ Next: ${nextPlayer(state)}`;
+    nextPlayer(state);
+    response = `🎭 *Charades for ${player}!*\n\n👁 Only *${player}* looks at this!\nWord: *${word}*\n\n⏱ 60 seconds to act it out!\n\n➡️ Next up: *${currentPlayer(state)}*\n\n${gameMenu(state)}`;
   }
-
-  // GAMES LIST
-  else if (msg === '!games') {
-    response = `🎮 *NightSpark Games:*\n\n🔥 *!truth* - Truth question\n🎯 *!dare* - Dare challenge\n🙅 *!nhie* - Never Have I Ever\n🤔 *!wyr* - Would You Rather\n🍾 *!spin* - Spin the bottle\n🍺 *!drink* - Drinking rule\n🎭 *!charades* - Charades\n\n*Current Mode:* ${state.mode.toUpperCase()}\n*Players:* ${state.players.length > 0 ? state.players.join(', ') : 'None added yet'}`;
+  else if (msg === '8') {
+    state.waitingFor = 'mode';
+    response = modeMenu();
   }
-
-  // DEFAULT
+  else if (msg === '9') {
+    state.waitingFor = 'players';
+    response = `👥 Type the new player names separated by commas:\n\nExample: *John, Sarah, Mike, Lisa*`;
+  }
   else {
-    response = `🌙 *NightSpark Bot*\nType *!help* to see all commands!\n\nQuick start:\n1️⃣ *!players Name1, Name2*\n2️⃣ Pick a mode: *!mode normal/naughty/extreme*\n3️⃣ Play: *!truth !dare !spin !nhie !wyr*`;
+    response = `🌙 *NightSpark*\n\n${gameMenu(state)}`;
   }
 
   return response;
@@ -172,5 +181,5 @@ app.post('/webhook', (req, res) => {
 
 app.get('/', (req, res) => res.send('🌙 NightSpark Bot is running!'));
 
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`NightSpark Bot running on port ${PORT}`));
